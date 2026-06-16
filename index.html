@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Education Dashboard</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+:root{--blue:#2459b8;--bg:#f5f7fb;--card:#fff;--line:#d9e1ec;--muted:#667085;--red:#b83232;--gold:#b7791f;--green:#13865b}
+*{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;background:var(--bg);color:#1d2530}
+header{background:linear-gradient(135deg,#14396f,#2c66ca);color:white;padding:24px 32px}header h1{margin:0 0 8px}
+.layout{display:grid;grid-template-columns:310px 1fr;gap:18px;max-width:1600px;margin:auto;padding:18px}
+aside,.card{background:white;border:1px solid var(--line);border-radius:14px;padding:16px;box-shadow:0 2px 10px #0001}
+aside{position:sticky;top:14px;align-self:start}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px}.two{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:950px){.layout,.two{grid-template-columns:1fr}aside{position:relative}}
+label{display:block;font-size:12px;color:var(--muted);font-weight:bold;margin:12px 0 4px}
+input,select,button{width:100%;padding:9px;border:1px solid var(--line);border-radius:8px;background:white}button{background:var(--blue);color:white;font-weight:bold;margin-top:10px;cursor:pointer}.secondary{background:#eef3fb;color:#14396f}
+.kpi{background:#eef4ff;border:1px solid #d8e5ff;border-radius:12px;padding:14px}.kpi b{display:block;font-size:12px;color:var(--muted)}.kpi span{font-size:25px;font-weight:bold}
+canvas{width:100%;height:330px;border:1px solid var(--line);border-radius:10px;background:white}
+table{width:100%;border-collapse:collapse;font-size:13px;background:white}th,td{border-bottom:1px solid var(--line);padding:7px;text-align:left;vertical-align:top}th{background:#f1f4f9;position:sticky;top:0;cursor:pointer}
+.wrap{max-height:420px;overflow:auto;border:1px solid var(--line);border-radius:10px}.small{font-size:13px;color:var(--muted);line-height:1.45}.warn{color:var(--red);font-weight:bold}
+.pill{display:inline-block;padding:3px 8px;border-radius:12px;font-size:12px;font-weight:bold}.High{background:#ffd6d6;color:#8a1717}.Moderate{background:#ffe9b8;color:#7a4c00}.Low{background:#dff5e8;color:#0b6840}
+</style>
+</head>
+<body>
+<header>
+<h1>Education Research + Educator Action Dashboard</h1>
+<p><b>How to use:</b> Upload a CSV, choose an outcome/group/measure, apply filters, then review charts, priority flags, similar students, and tables. This is one offline HTML file.</p>
+</header>
+
+<div class="layout">
+<aside>
+<h3>Filters</h3>
+<label>Upload CSV</label><input type="file" id="file" accept=".csv,text/csv">
+<label>Outcome column</label><select id="outcome"></select>
+<label>Compare groups by</label><select id="group"></select>
+<label>Performance measure</label><select id="measure"></select>
+<label>Filter column</label><select id="filterCol"><option value="">No filter</option></select>
+<label>Filter value</label><select id="filterVal"><option value="">All</option></select>
+<button onclick="run()">Update dashboard</button>
+<button class="secondary" onclick="resetFilters()">Reset filters</button>
+<p id="status" class="small">No CSV loaded yet.</p><p id="error" class="warn"></p>
+<p class="small"><b>Educator use:</b> Start with high priority students, filter by course or demographic group, and use Similar Student Finder for targeted interventions.</p>
+</aside>
+
+<main>
+<div class="grid" id="kpis"></div>
+
+<div class="two">
+<div class="card"><h3>Educator Priority Summary</h3><div id="priority"></div></div>
+<div class="card"><h3>Student Profile Groups</h3><div id="profiles"></div></div>
+</div>
+
+<div class="two">
+<div class="card"><h3>Outcome Distribution</h3><canvas id="outcomeChart"></canvas></div>
+<div class="card"><h3>Average Performance by Group</h3><canvas id="groupChart"></canvas></div>
+</div>
+<div class="two">
+<div class="card"><h3>Performance Distribution</h3><canvas id="histChart"></canvas></div>
+<div class="card"><h3>1st vs 2nd Semester Grade</h3><canvas id="scatterChart"></canvas></div>
+</div>
+
+<div class="card">
+<h3>Targeted Intervention Roster</h3>
+<div class="grid">
+<div><label>Risk level</label><select id="riskFilter"><option>All</option><option>High</option><option>Moderate</option><option>Low</option></select></div>
+<div><label>Profile</label><select id="profileFilter"><option>All</option><option>Strong progress</option><option>Steady / average</option><option>Low progress</option><option>Engaged but struggling</option><option>Limited information</option></select></div>
+<div><label>Search roster</label><input id="rosterSearch" oninput="riskTable()" placeholder="Search roster"></div>
+<div><button onclick="downloadRoster()">Download roster CSV</button></div>
+</div>
+<div id="riskTable"></div>
+</div>
+
+<div class="two">
+<div class="card"><h3>Similar Student Finder</h3>
+<label>Student row number</label><input id="studentRow" type="number" min="1">
+<label>Number of matches</label><input id="matchN" type="number" min="3" value="5">
+<button onclick="findSimilar()">Find similar students</button><div id="similarTable"></div></div>
+<div class="card"><h3>Profile Group Comparison</h3><div id="profileTable"></div></div>
+</div>
+
+<div class="card"><h3>Group Comparison Table</h3><p class="small">Click headers to sort.</p><div id="groupTable"></div></div>
+<div class="card"><h3>Searchable Student Data Table</h3><input id="dataSearch" oninput="studentTable()" placeholder="Search filtered data..."><div id="dataTable"></div></div>
+<div class="card"><h3>Data Quality Check</h3><div id="quality"></div></div>
+</main>
+</div>
+
+<script>
+/* Mini embedded Chart.js-compatible class so the dashboard remains one offline file. */
+class Chart{constructor(ctx,cfg){this.ctx=ctx;this.config=cfg;this.update()}destroy(){this.ctx.clearRect(0,0,this.ctx.canvas.width,this.ctx.canvas.height)}update(){drawChart(this.ctx,this.config)}}
+
+/* Data state */
+let raw=[],filtered=[],scored=[],cols=[],charts={},sorts={};
+const expected=["Application mode","Application order","Course","evening attendance","Previous qualification","Nacionality","Displaced","Educational special needs","Gender","Scholarship holder","Age at enrollment","International","Curricular units 1st sem (approved)","Curricular units 1st sem (grade)","Curricular units 2nd sem (approved)","Curricular units 2nd sem (grade)","Inflation rate","GDP","Output"];
+const acad=["Curricular units 1st sem (approved)","Curricular units 2nd sem (approved)","Curricular units 1st sem (grade)","Curricular units 2nd sem (grade)","Curricular units 1st sem (enrolled)","Curricular units 2nd sem (enrolled)"];
+
+/* Upload and browser CSV parsing */
+document.getElementById("file").addEventListener("change",e=>{
+ try{let f=e.target.files[0];if(!f)return;let r=new FileReader();r.onload=ev=>{raw=parseCSV(ev.target.result);if(!raw.length)throw Error("No data rows found.");cols=Object.keys(raw[0]).filter(c=>c!="__row");setup();run()};r.onerror=()=>err("Could not read file.");r.readAsText(f)}catch(x){err(x.message)}
+});
+function parseCSV(t){
+ t=t.replace(/^\uFEFF/,"");let rows=[],row=[],cell="",q=false;
+ for(let i=0;i<t.length;i++){let ch=t[i],nx=t[i+1];if(ch=='"'&&q&&nx=='"'){cell+='"';i++;continue}if(ch=='"'){q=!q;continue}if(ch==","&&!q){row.push(cell);cell="";continue}if((ch=="\n"||ch=="\r")&&!q){if(ch=="\r"&&nx=="\n")i++;row.push(cell);if(row.join("").trim())rows.push(row);row=[];cell="";continue}cell+=ch}
+ if(q)throw Error("Malformed CSV: unclosed quote."); if(cell||row.length){row.push(cell);rows.push(row)} if(!rows.length)return[];
+ let h=rows[0].map(x=>x.trim()); if(h.some(x=>!x))throw Error("Malformed CSV: blank header name.");
+ return rows.slice(1).map((r,i)=>{let o={__row:i+1};h.forEach((c,j)=>o[c]=(r[j]??"").trim());return o});
+}
+function err(m){document.getElementById("error").textContent=m}
+
+/* Controls */
+document.getElementById("filterCol").addEventListener("change",updateFilterValues);
+document.getElementById("riskFilter").addEventListener("change",riskTable);
+document.getElementById("profileFilter").addEventListener("change",riskTable);
+function setup(){fill("outcome",cols,pick(["Output","output"]));fill("group",cols,pick(["Course","Gender","Scholarship holder","International","Application mode"]));fill("measure",numCols(),pick(["Curricular units 2nd sem (grade)","Curricular units 1st sem (grade)","Curricular units 2nd sem (approved)"]));fill("filterCol",["",...cols],"");updateFilterValues()}
+function fill(id,arr,sel){let s=document.getElementById(id);s.innerHTML="";arr.forEach(v=>{let o=document.createElement("option");o.value=v;o.textContent=v||"No filter";s.appendChild(o)});if(sel)s.value=sel}
+function pick(a){return a.find(x=>cols.includes(x))||cols[0]||""}
+function numCols(){return cols.filter(c=>raw.some(r=>Number.isFinite(parseFloat(r[c]))))}
+function updateFilterValues(){let c=document.getElementById("filterCol").value,vals=[""];if(c)vals=vals.concat([...new Set(raw.map(r=>r[c]||"Missing"))].sort().slice(0,300));fill("filterVal",vals,"")}
+function resetFilters(){document.getElementById("filterCol").value="";updateFilterValues();run()}
+
+/* Main update */
+function run(){try{if(!raw.length)return;let fc=document.getElementById("filterCol").value,fv=document.getElementById("filterVal").value;filtered=raw.filter(r=>!fc||!fv||(r[fc]||"Missing")==fv);scored=filtered.map(r=>({...r,...score(r)}));document.getElementById("status").textContent=`Loaded ${raw.length.toLocaleString()} rows; showing ${filtered.length.toLocaleString()} after filters.`;kpis();priority();profiles();chartsAll();tablesAll();quality()}catch(x){err("Dashboard error: "+x.message)}}
+function n(v){let x=parseFloat(v);return Number.isFinite(x)?x:null}
+function avg(a){a=a.filter(x=>x!==null);return a.length?a.reduce((p,c)=>p+c,0)/a.length:null}
+function count(col,data=scored){let m={};data.forEach(r=>{let k=r[col]||"Missing";m[k]=(m[k]||0)+1});return m}
+
+/* Educator risk/profile rules */
+function score(r){let s=0,why=[],g1=n(r["Curricular units 1st sem (grade)"]),g2=n(r["Curricular units 2nd sem (grade)"]),a1=n(r["Curricular units 1st sem (approved)"]),a2=n(r["Curricular units 2nd sem (approved)"]),e2=n(r["Curricular units 2nd sem (enrolled)"]);
+ if(g2!==null&&g2<10){s+=2;why.push("2nd semester grade below 10")} if(g1!==null&&g1<10){s++;why.push("1st semester grade below 10")} if(a2!==null&&a2<=2){s+=2;why.push("Very few 2nd semester approved units")} if(a1!==null&&a1<=2){s++;why.push("Few 1st semester approved units")} if(e2!==null&&a2!==null&&e2>0&&a2/e2<.5){s++;why.push("Less than half of enrolled 2nd semester units approved")}
+ let level=s>=4?"High":s>=2?"Moderate":"Low",profile="Limited information"; if(a1!==null&&a2!==null&&g1!==null&&g2!==null){if(a2>=6&&g2>=12)profile="Strong progress";else if(a2<=2||g2<10)profile="Low progress";else if(e2!==null&&e2>=5&&a2<4)profile="Engaged but struggling";else profile="Steady / average"}
+ let action=level=="High"?"Immediate outreach, advising, and tutoring.":level=="Moderate"?"Monitor this week and offer targeted support.":"Routine monitoring."; return{__riskScore:s,__riskLevel:level,__riskReasons:why.join("; "),__profile:profile,__action:action}}
+function kpis(){let d=document.getElementById("kpis");d.innerHTML="";addK("Students",scored.length.toLocaleString());["High","Moderate","Low"].forEach(l=>addK(l+" priority",scored.filter(r=>r.__riskLevel==l).length));let out=document.getElementById("outcome").value;if(out&&cols.includes(out)){let m=count(out),tot=scored.length||1;Object.entries(m).slice(0,3).forEach(([k,v])=>addK(k,`${v} (${Math.round(v/tot*100)}%)`))}["Curricular units 2nd sem (grade)","Curricular units 2nd sem (approved)"].forEach(c=>{if(cols.includes(c)){let a=avg(scored.map(r=>n(r[c])));if(a!==null)addK("Avg "+c,a.toFixed(2))}})}
+function addK(t,v){document.getElementById("kpis").innerHTML+=`<div class="kpi"><b>${t}</b><span>${v}</span></div>`}
+function priority(){let total=scored.length||1,h=scored.filter(r=>r.__riskLevel=="High").length,m=scored.filter(r=>r.__riskLevel=="Moderate").length,l=scored.filter(r=>r.__riskLevel=="Low").length;document.getElementById("priority").innerHTML=`<table><tr><th>Priority</th><th>N</th><th>%</th></tr><tr><td>High</td><td>${h}</td><td>${Math.round(h/total*100)}%</td></tr><tr><td>Moderate</td><td>${m}</td><td>${Math.round(m/total*100)}%</td></tr><tr><td>Low</td><td>${l}</td><td>${Math.round(l/total*100)}%</td></tr></table><p class="small">Suggested action: begin with high-priority rows, then review moderate-priority students by course or group.</p>`}
+function profiles(){let m=count("__profile");renderTable("profiles",Object.entries(m).map(([Profile,N])=>({Profile,N})),"profiles")}
+
+/* Charts using Chart-style calls */
+function chartsAll(){outcomeChart();groupChart();histChart();scatterChart()}
+function makeChart(id,type,labels,datasets){let ctx=document.getElementById(id).getContext("2d");if(charts[id])charts[id].destroy();charts[id]=new Chart(ctx,{type,data:{labels,datasets}})}
+function outcomeChart(){let o=document.getElementById("outcome").value;if(!o||!cols.includes(o))return makeChart("outcomeChart","bar",["No Output"],[{data:[0]}]);let m=count(o);makeChart("outcomeChart","bar",Object.keys(m),[{data:Object.values(m)}])}
+function groupChart(){let g=document.getElementById("group").value,m=document.getElementById("measure").value,obj={};scored.forEach(r=>{let k=r[g]||"Missing";(obj[k]||(obj[k]=[])).push(n(r[m]))});let e=Object.entries(obj).map(([k,v])=>[k,avg(v)]).filter(x=>x[1]!==null).sort((a,b)=>b[1]-a[1]).slice(0,12);makeChart("groupChart","bar",e.map(x=>x[0]),[{data:e.map(x=>+x[1].toFixed(2))}])}
+function histChart(){let m=document.getElementById("measure").value,vals=scored.map(r=>n(r[m])).filter(x=>x!==null);if(!vals.length)return makeChart("histChart","bar",["No numeric values"],[{data:[0]}]);let mn=Math.min(...vals),mx=Math.max(...vals),bins=12,ct=Array(bins).fill(0);vals.forEach(v=>ct[Math.min(bins-1,Math.floor((v-mn)/(mx-mn||1)*bins))]++);makeChart("histChart","bar",ct.map((_,i)=>(mn+(mx-mn)*i/bins).toFixed(1)),[{data:ct}])}
+function scatterChart(){let xcol="Curricular units 1st sem (grade)",ycol="Curricular units 2nd sem (grade)";if(!cols.includes(xcol)||!cols.includes(ycol))return makeChart("scatterChart","scatter",[],[{label:"Missing grade columns",data:[]}]);let groups={High:[],Moderate:[],Low:[]};scored.forEach(r=>{let x=n(r[xcol]),y=n(r[ycol]);if(x!==null&&y!==null)groups[r.__riskLevel].push({x,y})});makeChart("scatterChart","scatter",[],[{label:"High",data:groups.High,color:"#b83232"},{label:"Moderate",data:groups.Moderate,color:"#b7791f"},{label:"Low",data:groups.Low,color:"#13865b"}])}
+
+/* Tables */
+function tablesAll(){riskTable();groupTable();profileTable();studentTable()}
+function riskTable(){let rf=document.getElementById("riskFilter").value,pf=document.getElementById("profileFilter").value,q=(document.getElementById("rosterSearch").value||"").toLowerCase();let rows=scored.filter(r=>(rf=="All"||r.__riskLevel==rf)&&(pf=="All"||r.__profile==pf)&&(!q||JSON.stringify(r).toLowerCase().includes(q))).sort((a,b)=>b.__riskScore-a.__riskScore).slice(0,100).map(r=>({Row:r.__row,Priority:`<span class="pill ${r.__riskLevel}">${r.__riskLevel}</span>`,Profile:r.__profile,Reasons:r.__riskReasons||"No current flags",Action:r.__action,Course:r.Course||"",Output:r.Output||""}));renderTable("riskTable",rows,"risk")}
+function groupTable(){let g=document.getElementById("group").value,m=document.getElementById("measure").value,o=document.getElementById("outcome").value;let rows=[...new Set(scored.map(r=>r[g]||"Missing"))].slice(0,60).map(gr=>{let rs=scored.filter(r=>(r[g]||"Missing")==gr),a=avg(rs.map(r=>n(r[m]))),hp=rs.filter(r=>r.__riskLevel=="High").length,top="";if(o){let c=count(o,rs);top=Object.entries(c).sort((a,b)=>b[1]-a[1])[0]?.join(": ")||""}return{Group:gr,N:rs.length,Average:a==null?"":a.toFixed(2),"High priority":hp,"Most common outcome":top}});renderTable("groupTable",rows,"group")}
+function profileTable(){let out=document.getElementById("outcome").value;let rows=[...new Set(scored.map(r=>r.__profile))].map(p=>{let rs=scored.filter(r=>r.__profile==p),top="";if(out){let c=count(out,rs);top=Object.entries(c).sort((a,b)=>b[1]-a[1])[0]?.join(": ")||""}return{Profile:p,N:rs.length,"Avg 2nd grade":fmt(avg(rs.map(r=>n(r["Curricular units 2nd sem (grade)"])))),"Avg 2nd approved":fmt(avg(rs.map(r=>n(r["Curricular units 2nd sem (approved)"])))),"Most common outcome":top}});renderTable("profileTable",rows,"profile")}
+function studentTable(){let q=(document.getElementById("dataSearch")?.value||"").toLowerCase(),show=["__row",...cols].slice(0,12);let rows=scored.filter(r=>!q||JSON.stringify(r).toLowerCase().includes(q)).slice(0,300).map(r=>{let o={};show.forEach(c=>o[c=="__row"?"Row":c]=r[c]||"");return o});renderTable("dataTable",rows,"data")}
+function renderTable(id,rows,key){if(!rows.length){document.getElementById(id).innerHTML="<p class='small'>No rows to display.</p>";return}let h=Object.keys(rows[0]),st=sorts[key]||{};if(st.col)rows.sort((a,b)=>{let av=String(a[st.col]).replace(/<[^>]*>/g,""),bv=String(b[st.col]).replace(/<[^>]*>/g,""),an=parseFloat(av),bn=parseFloat(bv),cmp=(!isNaN(an)&&!isNaN(bn))?an-bn:av.localeCompare(bv);return st.dir=="desc"?-cmp:cmp});let html="<div class='wrap'><table><tr>"+h.map(x=>`<th onclick="sortT('${key}','${x}','${id}')">${x}${st.col==x?(st.dir=="asc"?" ▲":" ▼"):""}</th>`).join("")+"</tr>";rows.forEach(r=>html+="<tr>"+h.map(x=>`<td>${r[x]}</td>`).join("")+"</tr>");document.getElementById(id).innerHTML=html+"</table></div>"}
+function sortT(key,col,id){let s=sorts[key]||{};sorts[key]={col,dir:s.col==col&&s.dir=="asc"?"desc":"asc"};({risk:riskTable,group:groupTable,profile:profileTable,data:studentTable,profiles:profiles,similar:()=>{}}[key]||studentTable)()}
+
+/* Similarity and export */
+function findSimilar(){let row=+document.getElementById("studentRow").value,nm=+document.getElementById("matchN").value||5,target=scored.find(r=>r.__row==row);if(!target){document.getElementById("similarTable").innerHTML="<p class='warn'>Row not found.</p>";return}let use=acad.filter(c=>cols.includes(c)&&n(target[c])!==null),means={},sds={};use.forEach(c=>{let vals=scored.map(r=>n(r[c])).filter(x=>x!==null);means[c]=avg(vals);sds[c]=Math.sqrt(avg(vals.map(x=>(x-means[c])**2)))||1});let rows=scored.filter(r=>r.__row!=row).map(r=>{let d=0,k=0;use.forEach(c=>{let a=n(target[c]),b=n(r[c]);if(a!==null&&b!==null){d+=((a-means[c])/sds[c]-(b-means[c])/sds[c])**2;k++}});return{r,d:Math.sqrt(d),k}}).filter(x=>x.k).sort((a,b)=>a.d-b.d).slice(0,nm).map(x=>({Row:x.r.__row,Distance:x.d.toFixed(2),Priority:x.r.__riskLevel,Profile:x.r.__profile,"2nd grade":x.r["Curricular units 2nd sem (grade)"]||"",Output:x.r.Output||""}));renderTable("similarTable",rows,"similar")}
+function downloadRoster(){let headers=["Row","Priority","Profile","Reasons","Action","Course","Output"],rows=scored.sort((a,b)=>b.__riskScore-a.__riskScore);let csv=headers.join(",")+"\n"+rows.map(r=>[r.__row,r.__riskLevel,r.__profile,r.__riskReasons,r.__action,r.Course||"",r.Output||""].map(x=>`"${String(x).replaceAll('"','""')}"`).join(",")).join("\n");let a=document.createElement("a");a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));a.download="targeted_intervention_roster.csv";a.click()}
+
+/* Data quality */
+function quality(){let miss=expected.filter(c=>!cols.includes(c)),extra=cols.filter(c=>!expected.includes(c));let rows=cols.map(c=>({Column:c,"Missing cells":raw.filter(r=>(r[c]||"").trim()=="").length,"Detected type":raw.filter(r=>n(r[c])!==null).length/raw.length>.8?"Mostly numeric":"Categorical/text"}));let html=`<p><b>Columns detected:</b> ${cols.length}</p>`+(miss.length?`<p class="warn">Missing expected columns: ${miss.join(", ")}</p>`:"<p>No expected-column gaps detected.</p>")+(extra.length?`<p><b>Additional columns:</b> ${extra.join(", ")}</p>`:"")+"<div id='qTable'></div>";document.getElementById("quality").innerHTML=html;renderTable("qTable",rows,"quality")}
+
+/* Simple renderer used by the embedded Chart-compatible class */
+function drawChart(ctx,cfg){let c=ctx.canvas;c.width=c.clientWidth||700;c.height=350;ctx.clearRect(0,0,c.width,c.height);ctx.font="12px Arial";let left=55,top=25,W=c.width-75,H=c.height-75,colors=["#2459b8","#13865b","#b83232","#b7791f","#6b46c1"];ctx.strokeStyle="#d9e1ec";ctx.strokeRect(left,top,W,H);
+ if(cfg.type=="scatter"){let all=cfg.data.datasets.flatMap(d=>d.data);if(!all.length){ctx.fillText("No data",20,25);return}let xs=all.map(p=>p.x),ys=all.map(p=>p.y),xmin=Math.min(...xs),xmax=Math.max(...xs),ymin=Math.min(...ys),ymax=Math.max(...ys);cfg.data.datasets.forEach((d,i)=>{ctx.fillStyle=d.color||colors[i%colors.length];(d.data||[]).slice(0,6000).forEach(p=>{let x=left+(p.x-xmin)/(xmax-xmin||1)*W,y=top+H-(p.y-ymin)/(ymax-ymin||1)*H;ctx.beginPath();ctx.arc(x,y,3,0,7);ctx.fill()});ctx.fillText(d.label||"",left+10+i*95,18)});return}
+ let labels=cfg.data.labels||[],vals=cfg.data.datasets[0]?.data||[],max=Math.max(...vals,1),bw=Math.max(10,W/Math.max(labels.length,1)-8),base=top+H;labels.forEach((l,i)=>{let h=vals[i]/max*H,x=left+i*(bw+8)+4;ctx.fillStyle=colors[0];ctx.fillRect(x,base-h,bw,h);ctx.fillStyle="#111";ctx.fillText(String(vals[i]).slice(0,7),x,base-h-5);ctx.save();ctx.translate(x,base+15);ctx.rotate(-.72);ctx.fillText(String(l).slice(0,18),0,0);ctx.restore()})}
+</script>
+</body>
+</html>
