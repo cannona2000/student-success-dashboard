@@ -90,6 +90,10 @@ class Chart{constructor(ctx,cfg){this.ctx=ctx;this.config=cfg;this.update()}dest
 
 /* Data state */
 let raw=[],filtered=[],scored=[],cols=[],charts={},sorts={};
+function fmt(x){
+  return x == null || isNaN(x) ? "" : Number(x).toFixed(2);
+}
+ 
 const expected=["Application mode","Application order","Course","evening attendance","Previous qualification","Nacionality","Displaced","Educational special needs","Gender","Scholarship holder","Age at enrollment","International","Curricular units 1st sem (approved)","Curricular units 1st sem (grade)","Curricular units 2nd sem (approved)","Curricular units 2nd sem (grade)","Inflation rate","GDP","Output"];
 const acad=["Curricular units 1st sem (approved)","Curricular units 2nd sem (approved)","Curricular units 1st sem (grade)","Curricular units 2nd sem (grade)","Curricular units 1st sem (enrolled)","Curricular units 2nd sem (enrolled)"];
 
